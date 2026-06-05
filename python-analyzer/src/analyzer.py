@@ -6,8 +6,10 @@ from src.models import Vacancy
 
 
 def _city(area: str) -> str:
+    if not area:
+        return "Не указан"
     m = re.match(r"^([^,]+)", area)
-    return m.group(1).strip() if m else area or "Не указан"
+    return m.group(1).strip() if m else area
 
 
 def analyze_vacancies(vacancies: list[Vacancy]) -> dict:
