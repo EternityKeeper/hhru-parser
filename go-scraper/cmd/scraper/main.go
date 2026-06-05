@@ -5,31 +5,87 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/user/hhru-parser/go-scraper/internal/models"
 	"github.com/user/hhru-parser/go-scraper/internal/parser"
 )
 
+var areaNames = map[int]string{
+	1:    "Москва",
+	2:    "Санкт-Петербург",
+	3:    "Екатеринбург",
+	4:    "Новосибирск",
+	53:   "Краснодар",
+	88:   "Казань",
+	92:   "Тула",
+	113:  "Россия",
+	1913: "Тульская область",
+}
+
+func areaName(id int) string {
+	if name, ok := areaNames[id]; ok {
+		return name
+	}
+	return fmt.Sprintf("id=%d", id)
+}
+
+type outputJSON struct {
+	Meta      outputMeta        `json:"meta"`
+	Vacancies []models.Vacancy  `json:"vacancies"`
+}
+
+type outputMeta struct {
+	Query     string   `json:"query"`
+	Areas     []int    `json:"areas"`
+	AreaNames []string `json:"area_names"`
+	Period    int      `json:"period"`
+	Pages     int      `json:"max_pages"`
+	ScrapedAt string   `json:"scraped_at"`
+	Total     int      `json:"total"`
+}
+
 func main() {
 	query := flag.String("q", "Python", "поисковый запрос")
-	area := flag.Int("area", 1, "регион (1 - Москва, 2 - СПб)")
+	areasRaw := flag.String("areas", "1,2,92", "регионы через запятую (1=Москва, 2=СПб, 92=Тула)")
 	period := flag.Int("period", 30, "период в днях")
 	pages := flag.Int("pages", 0, "максимум страниц (0 = все)")
 	output := flag.String("o", "data/vacancies.json", "файл для сохранения")
 	flag.Parse()
 
+	areas := parseAreas(*areasRaw)
+	if len(areas) == 0 {
+		fmt.Fprintf(os.Stderr, "Некорректный список регионов: %s\n", *areasRaw)
+		os.Exit(1)
+	}
+
 	client := parser.NewClient()
 	fmt.Printf("HH.ru Parser — поиск: %s\n", *query)
+	fmt.Printf("Регионы: %s\n", formatAreas(areas))
 	fmt.Printf("Запуск: %s\n", time.Now().Format(time.RFC3339))
 
-	vacancies, err := client.ScrapeAll(*query, *area, *period, *pages)
+	vacancies, err := client.ScrapeAll(*query, areas, *period, *pages)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Ошибка: %v\n", err)
 		os.Exit(1)
 	}
 
-	data, err := json.MarshalIndent(vacancies, "", "  ")
+	out := outputJSON{
+		Meta: outputMeta{
+			Query:     *query,
+			Areas:     areas,
+			AreaNames: mapAreasToNames(areas),
+			Period:    *period,
+			Pages:     *pages,
+			ScrapedAt: time.Now().Format(time.RFC3339),
+			Total:     len(vacancies),
+		},
+		Vacancies: vacancies,
+	}
+
+	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Ошибка сериализации: %v\n", err)
 		os.Exit(1)
@@ -50,8 +106,35 @@ func main() {
 	}
 
 	fmt.Printf("Сохранено %d вакансий в %s\n", len(vacancies), *output)
+}
 
-	_ = models.Vacancy{}
+func parseAreas(raw string) []int {
+	parts := strings.Split(raw, ",")
+	var ids []int
+	for _, p := range parts {
+		id, err := strconv.Atoi(strings.TrimSpace(p))
+		if err != nil {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func formatAreas(ids []int) string {
+	var names []string
+	for _, id := range ids {
+		names = append(names, areaName(id))
+	}
+	return strings.Join(names, ", ")
+}
+
+func mapAreasToNames(ids []int) []string {
+	var names []string
+	for _, id := range ids {
+		names = append(names, areaName(id))
+	}
+	return names
 }
 
 func dirFromPath(p string) string {

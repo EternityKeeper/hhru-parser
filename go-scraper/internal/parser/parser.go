@@ -100,41 +100,54 @@ func (c *Client) fetchDoc(urlStr string) (*goquery.Document, error) {
 	return doc, nil
 }
 
-func (c *Client) ScrapeAll(query string, area int, period int, maxPages int) ([]models.Vacancy, error) {
-	var allLinks []vacancyLink
+func (c *Client) ScrapeAll(query string, areas []int, period int, maxPages int) ([]models.Vacancy, error) {
+	var allVacancies []models.Vacancy
 
-	for page := 0; ; page++ {
-		if maxPages > 0 && page >= maxPages {
-			break
+	for _, area := range areas {
+		log.Printf("=== Scraping area %d ===", area)
+
+		var allLinks []vacancyLink
+
+		for page := 0; ; page++ {
+			if maxPages > 0 && page >= maxPages {
+				break
+			}
+
+			u := fmt.Sprintf("%s?text=%s&area=%d&page=%d&items_on_page=50&order_by=publication_time",
+				baseSearchURL, url.QueryEscape(query), area, page)
+			if period > 0 {
+				u += fmt.Sprintf("&search_period=%d", period)
+			}
+
+			log.Printf("Search page %d: %s", page, u)
+
+			doc, err := c.fetchDoc(u)
+			if err != nil {
+				return nil, fmt.Errorf("search page %d (area %d): %v", page, area, err)
+			}
+
+			links := parseSearchPage(doc)
+			if len(links) == 0 {
+				log.Printf("No more vacancies found on page %d (area %d)", page, area)
+				break
+			}
+
+			allLinks = append(allLinks, links...)
+			log.Printf("Found %d vacancies on page %d (total: %d, area %d)", len(links), page, len(allLinks), area)
 		}
 
-		u := fmt.Sprintf("%s?text=%s&area=%d&page=%d&items_on_page=50&order_by=publication_time",
-			baseSearchURL, url.QueryEscape(query), area, page)
-		if period > 0 {
-			u += fmt.Sprintf("&search_period=%d", period)
+		if len(allLinks) == 0 {
+			log.Printf("No vacancies found for area %d, skipping", area)
+			continue
 		}
 
-		log.Printf("Search page %d: %s", page, u)
+		log.Printf("Fetching details for %d vacancies in area %d...", len(allLinks), area)
 
-		doc, err := c.fetchDoc(u)
-		if err != nil {
-			return nil, fmt.Errorf("search page %d: %v", page, err)
-		}
-
-		links := parseSearchPage(doc)
-		if len(links) == 0 {
-			log.Printf("No more vacancies found on page %d", page)
-			break
-		}
-
-		allLinks = append(allLinks, links...)
-		log.Printf("Found %d vacancies on page %d (total: %d)", len(links), page, len(allLinks))
+		vacancies := c.fetchDetails(allLinks)
+		allVacancies = append(allVacancies, vacancies...)
 	}
 
-	log.Printf("Fetching details for %d vacancies...", len(allLinks))
-
-	vacancies := c.fetchDetails(allLinks)
-	return vacancies, nil
+	return allVacancies, nil
 }
 
 type vacancyLink struct {
