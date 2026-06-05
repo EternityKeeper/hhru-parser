@@ -1,202 +1,380 @@
 package parser
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
+	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/user/hhru-parser/go-scraper/internal/models"
 )
 
 const (
-	BaseURL = "https://api.hh.ru"
-	PerPage = 100
+	baseSearchURL = "https://hh.ru/search/vacancy"
+	baseVacURL    = "https://hh.ru/vacancy"
+	maxRetries    = 3
 )
 
+var userAgents = []string{
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
+}
+
 type Client struct {
-	http    *http.Client
-	mu      sync.Mutex
-	calls   int
+	httpClient *http.Client
+	rateLimiter <-chan time.Time
+	workers     int
 }
 
 func NewClient() *Client {
 	return &Client{
-		http: &http.Client{
-			Timeout: 30 * time.Second,
+		httpClient: &http.Client{
+			Timeout: 15 * time.Second,
 		},
+		rateLimiter: time.Tick(300 * time.Millisecond),
+		workers:     3,
 	}
 }
 
-func (c *Client) rateLimit() {
-	c.mu.Lock()
-	c.calls++
-	count := c.calls
-	c.mu.Unlock()
-
-	if count%10 == 0 {
-		time.Sleep(1 * time.Second)
-	}
+func (c *Client) randUA() string {
+	return userAgents[rand.Intn(len(userAgents))]
 }
 
-func (c *Client) SearchVacancies(req models.SearchRequest) (*models.SearchResponse, error) {
-	c.rateLimit()
-
-	params := url.Values{}
-	params.Set("text", req.Text)
-	params.Set("page", strconv.Itoa(req.Page))
-	params.Set("per_page", strconv.Itoa(PerPage))
-	if req.Area > 0 {
-		params.Set("area", strconv.Itoa(req.Area))
-	}
-	if req.Period > 0 {
-		params.Set("period", strconv.Itoa(req.Period))
-	}
-
-	u := fmt.Sprintf("%s/vacancies?%s", BaseURL, params.Encode())
-	resp, err := c.http.Get(u)
+func (c *Client) newReq(urlStr string) (*http.Request, error) {
+	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, err
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API error: %s", resp.Status)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read body failed: %w", err)
-	}
-
-	var result models.SearchResponse
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("unmarshal failed: %w", err)
-	}
-
-	return &result, nil
+	req.Header.Set("User-Agent", c.randUA())
+	return req, nil
 }
 
-func (c *Client) GetVacancy(id string) (*models.VacancyRaw, error) {
-	c.rateLimit()
-
-	u := fmt.Sprintf("%s/vacancies/%s", BaseURL, id)
-	resp, err := c.http.Get(u)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API error: %s", resp.Status)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read body failed: %w", err)
-	}
-
-	var v models.VacancyRaw
-	if err := json.Unmarshal(body, &v); err != nil {
-		return nil, fmt.Errorf("unmarshal failed: %w", err)
-	}
-
-	return &v, nil
-}
-
-func (c *Client) ScrapeAll(text string, area, period, maxPages int) ([]models.Vacancy, error) {
-	var all []models.Vacancy
-
-	first, err := c.SearchVacancies(models.SearchRequest{
-		Text:    text,
-		Area:    area,
-		Period:  period,
-		Page:    0,
-		PerPage: PerPage,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("first request: %w", err)
-	}
-
-	totalPages := first.Pages
-	if maxPages > 0 && maxPages < totalPages {
-		totalPages = maxPages
-	}
-
-	fmt.Printf("Found %d vacancies, scraping %d pages...\n", first.Found, totalPages)
-
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, 5)
-
-	processPage := func(page int) {
-		defer wg.Done()
-		sem <- struct{}{}
-		defer func() { <-sem }()
-
-		resp, err := c.SearchVacancies(models.SearchRequest{
-			Text:    text,
-			Area:    area,
-			Period:  period,
-			Page:    page,
-			PerPage: PerPage,
-		})
+func (c *Client) doRequest(req *http.Request) (*http.Response, error) {
+	<-c.rateLimiter
+	var resp *http.Response
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		resp, err = c.httpClient.Do(req)
 		if err != nil {
-			fmt.Printf("Page %d error: %v\n", page, err)
-			return
+			time.Sleep(time.Second)
+			continue
+		}
+		if resp.StatusCode == 429 {
+			resp.Body.Close()
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		if resp.StatusCode == 200 || resp.StatusCode == 404 {
+			return resp, nil
+		}
+		resp.Body.Close()
+		time.Sleep(time.Second)
+	}
+	return resp, err
+}
+
+func (c *Client) fetchDoc(urlStr string) (*goquery.Document, error) {
+	req, err := c.newReq(urlStr)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, urlStr)
+	}
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return doc, nil
+}
+
+func (c *Client) ScrapeAll(query string, area int, period int, maxPages int) ([]models.Vacancy, error) {
+	var allLinks []vacancyLink
+
+	for page := 0; ; page++ {
+		if maxPages > 0 && page >= maxPages {
+			break
 		}
 
-		for _, raw := range resp.Items {
-			v := convertVacancy(raw)
-			mu.Lock()
-			all = append(all, v)
-			mu.Unlock()
+		u := fmt.Sprintf("%s?text=%s&area=%d&page=%d&items_on_page=50&order_by=publication_time",
+			baseSearchURL, url.QueryEscape(query), area, page)
+		if period > 0 {
+			u += fmt.Sprintf("&search_period=%d", period)
 		}
-		fmt.Printf("Page %d/%d done (%d items)\n", page+1, totalPages, len(resp.Items))
+
+		log.Printf("Search page %d: %s", page, u)
+
+		doc, err := c.fetchDoc(u)
+		if err != nil {
+			return nil, fmt.Errorf("search page %d: %v", page, err)
+		}
+
+		links := parseSearchPage(doc)
+		if len(links) == 0 {
+			log.Printf("No more vacancies found on page %d", page)
+			break
+		}
+
+		allLinks = append(allLinks, links...)
+		log.Printf("Found %d vacancies on page %d (total: %d)", len(links), page, len(allLinks))
 	}
 
-	for page := 0; page < totalPages; page++ {
+	log.Printf("Fetching details for %d vacancies...", len(allLinks))
+
+	vacancies := c.fetchDetails(allLinks)
+	return vacancies, nil
+}
+
+type vacancyLink struct {
+	URL     string
+	Title   string
+	Company string
+	Salary  string
+	Address string
+	Metro   string
+	Exp     string
+	Schedule string
+}
+
+func parseSearchPage(doc *goquery.Document) []vacancyLink {
+	var links []vacancyLink
+
+	doc.Find("div[data-qa=vacancy-serp__vacancy]").Each(func(i int, s *goquery.Selection) {
+		v := vacancyLink{}
+
+		titleSel := s.Find("a[data-qa=serp-item__title]")
+		v.URL, _ = titleSel.Attr("href")
+		v.Title = strings.TrimSpace(titleSel.Find("span[data-qa=serp-item__title-text]").Text())
+
+		v.Company = strings.TrimSpace(s.Find("span[data-qa=vacancy-serp__vacancy-employer-text]").Text())
+
+		compSel := s.Find("span[data-qa=vacancy-serp__vacancy-compensation]")
+		if compSel.Length() == 0 {
+			compSel = s.Find("span[data-qa^=vacancy-serp__vacancy-compensation-frequency]")
+		}
+		v.Salary = strings.TrimSpace(compSel.Text())
+
+		v.Address = strings.TrimSpace(s.Find("span[data-qa=vacancy-serp__vacancy-address]").Text())
+
+		metroSel := s.Find("span[data-qa=address-metro-station-name]")
+		var metroParts []string
+		metroSel.Each(func(i int, sel *goquery.Selection) {
+			t := strings.TrimSpace(sel.Text())
+			if t != "" {
+				metroParts = append(metroParts, t)
+			}
+		})
+		v.Metro = strings.Join(metroParts, ", ")
+
+		expSel := s.Find("[data-qa^=vacancy-serp__vacancy-work-experience]")
+		v.Exp = strings.TrimSpace(expSel.First().Text())
+
+		scheduleSel := s.Find("[data-qa^=vacancy-label-work-schedule]")
+		v.Schedule = strings.TrimSpace(scheduleSel.First().Text())
+
+		if v.Title != "" && v.URL != "" {
+			links = append(links, v)
+		}
+	})
+
+	return links
+}
+
+func (c *Client) fetchDetails(links []vacancyLink) []models.Vacancy {
+	var (
+		mu        sync.Mutex
+		vacancies []models.Vacancy
+		wg        sync.WaitGroup
+		sem       = make(chan struct{}, c.workers)
+	)
+
+	for _, link := range links {
 		wg.Add(1)
-		go processPage(page)
+		sem <- struct{}{}
+		go func(l vacancyLink) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			v := c.fetchVacancyPage(l)
+			if v != nil {
+				mu.Lock()
+				vacancies = append(vacancies, *v)
+				mu.Unlock()
+			}
+		}(link)
 	}
 
 	wg.Wait()
-	return all, nil
+	return vacancies
 }
 
-func convertVacancy(raw models.VacancyRaw) models.Vacancy {
-	v := models.Vacancy{
-		ID:          raw.ID,
-		Name:        raw.Name,
-		Area:        raw.Area.Name,
-		Description: raw.Description,
-		Experience:  raw.Experience.Name,
-		Schedule:    raw.Schedule.Name,
-		Employment:  raw.Employment.Name,
-		Employer:    raw.Employer.Name,
+func (c *Client) fetchVacancyPage(l vacancyLink) *models.Vacancy {
+	doc, err := c.fetchDoc(l.URL)
+	if err != nil {
+		log.Printf("Error fetching %s: %v", l.URL, err)
+		return nil
 	}
 
-	if raw.Salary != nil {
-		v.SalaryFrom = raw.Salary.From
-		v.SalaryTo = raw.Salary.To
-		v.SalaryCurr = raw.Salary.Currency
+	v := &models.Vacancy{
+		Name:       l.Title,
+		Employer:   l.Company,
+		Area:       l.Address,
+		Experience: l.Exp,
+		Schedule:   l.Schedule,
 	}
 
-	for _, s := range raw.KeySkills {
-		v.KeySkills = append(v.KeySkills, s.Name)
+	if l.Metro != "" {
+		if v.Area != "" {
+			v.Area += ", " + l.Metro
+		} else {
+			v.Area = l.Metro
+		}
 	}
 
-	if t, err := time.Parse(time.RFC3339, raw.PublishedAt); err == nil {
-		v.PublishedAt = t
+	if t := strings.TrimSpace(doc.Find("a[data-qa=vacancy-company-name]").First().Text()); t != "" {
+		v.Employer = t
 	}
+	if t := strings.TrimSpace(doc.Find("div[data-qa=vacancy-address-with-map]").Text()); t != "" {
+		v.Area = t
+	}
+	if t := strings.TrimSpace(doc.Find("span[data-qa=vacancy-experience]").Text()); t != "" {
+		v.Experience = t
+	}
+	schedSel := doc.Find("div[data-qa=work-schedule-by-days-text]")
+	if schedSel.Length() == 0 {
+		schedSel = doc.Find("div[data-qa=work-formats-text]")
+	}
+	if t := strings.TrimSpace(schedSel.Text()); t != "" {
+		v.Schedule = t
+	}
+
+	salarySel := doc.Find("div[data-qa=vacancy-salary]")
+	if salarySel.Length() == 0 {
+		salarySel = doc.Find("span[data-qa=vacancy-salary-compensation-type-net]")
+	}
+	if t := strings.TrimSpace(salarySel.Text()); t != "" {
+		parseSalary(v, t)
+	}
+
+	if t := strings.TrimSpace(doc.Find("h1[data-qa=vacancy-title]").Text()); t != "" {
+		v.Name = t
+	}
+
+	descSel := doc.Find("div[data-qa=vacancy-description]")
+	if descSel.Length() > 0 {
+		v.Description = strings.TrimSpace(descSel.Text())
+	}
+
+	doc.Find("li[data-qa=skills-element]").Each(func(i int, s *goquery.Selection) {
+		if skill := strings.TrimSpace(s.Text()); skill != "" {
+			v.KeySkills = append(v.KeySkills, skill)
+		}
+	})
+
+	doc.Find("script[type='application/ld+json']").Each(func(i int, s *goquery.Selection) {
+		if v.PublishedAtRaw != "" {
+			return
+		}
+		jsonText := strings.TrimSpace(s.Text())
+		if idx := strings.Index(jsonText, `"datePosted"`); idx >= 0 {
+			remainder := jsonText[idx+12:]
+			colonIdx := strings.Index(remainder, ":")
+			if colonIdx >= 0 {
+				valStr := strings.TrimSpace(remainder[colonIdx+1:])
+				if len(valStr) > 2 && valStr[0] == '"' {
+					if endIdx := strings.Index(valStr[1:], `"`); endIdx >= 0 {
+						v.PublishedAtRaw = valStr[1 : endIdx+1]
+					}
+				}
+			}
+		}
+	})
 
 	return v
 }
 
-func MarshalVacancies(vacancies []models.Vacancy) ([]byte, error) {
-	return json.MarshalIndent(vacancies, "", "  ")
+func parseSalary(v *models.Vacancy, raw string) {
+	v.SalaryRaw = raw
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return
+	}
+
+	curr := ""
+	switch {
+	case strings.Contains(raw, "₽"):
+		curr = "RUR"
+	case strings.Contains(raw, "$"):
+		curr = "USD"
+	case strings.Contains(raw, "€"):
+		curr = "EUR"
+	case strings.Contains(raw, "₸"):
+		curr = "KZT"
+	default:
+		return
+	}
+	v.SalaryCurr = curr
+
+	normalized := strings.NewReplacer(
+		"\u00a0", "",
+		"\u202f", "",
+		"\u2009", "",
+		" ", "",
+	).Replace(raw)
+
+	if currIdx := strings.IndexAny(normalized, "₽$€₸"); currIdx >= 0 {
+		normalized = normalized[:currIdx]
+	}
+
+	if strings.Contains(normalized, "от") && strings.Contains(normalized, "до") {
+		parts := strings.SplitN(normalized, "до", 2)
+		if len(parts) == 2 {
+			fromStr := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(parts[0], "от"), "от"))
+			toStr := strings.TrimSpace(parts[1])
+			if from, err := strconv.Atoi(fromStr); err == nil {
+				v.SalaryFrom = &from
+			}
+			if to, err := strconv.Atoi(toStr); err == nil {
+				v.SalaryTo = &to
+			}
+		}
+	} else if strings.HasPrefix(normalized, "от") {
+		valStr := strings.TrimSpace(strings.TrimPrefix(normalized, "от"))
+		if val, err := strconv.Atoi(valStr); err == nil {
+			v.SalaryFrom = &val
+		}
+	} else if strings.HasPrefix(normalized, "до") {
+		valStr := strings.TrimSpace(strings.TrimPrefix(normalized, "до"))
+		if val, err := strconv.Atoi(valStr); err == nil {
+			v.SalaryTo = &val
+		}
+	} else if strings.Contains(normalized, "-") {
+		parts := strings.SplitN(normalized, "-", 2)
+		if len(parts) == 2 {
+			from, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
+			to, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
+			if err1 == nil {
+				v.SalaryFrom = &from
+			}
+			if err2 == nil {
+				v.SalaryTo = &to
+			}
+		}
+	} else {
+		if val, err := strconv.Atoi(normalized); err == nil {
+			v.SalaryFrom = &val
+		}
+	}
 }
