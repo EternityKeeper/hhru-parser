@@ -87,6 +87,17 @@ def _meta_html() -> str:
     return '<div class="meta-bar">' + " · ".join(parts) + "</div>"
 
 
+def _skills_badge(skills: list[str]) -> str:
+    if not skills:
+        return '<span style="color:#aaa">—</span>'
+    shown = skills[:5]
+    rest = len(skills) - 5
+    tags = "".join(f'<span class="skill-tag">{s}</span>' for s in shown)
+    if rest > 0:
+        tags += f' <span class="skill-tag skill-tag-more">+{rest}</span>'
+    return tags
+
+
 def _vacancies_table(vacancies: list[Vacancy]) -> str:
     if not vacancies:
         return '<p style="color:#888">Нет вакансий</p>'
@@ -99,9 +110,9 @@ def _vacancies_table(vacancies: list[Vacancy]) -> str:
         sal = v.salary_raw or "—"
         level = classify_level(v.name, v.description or "", v.experience)
         color = level_colors.get(level, "#888")
-        rows += f"""<tr><td>{name}</td><td>{employer}</td><td>{area}</td><td>{sal}</td><td><span class="level-badge" style="background:{color}">{level}</span></td></tr>"""
+        rows += f"""<tr><td>{name}</td><td>{employer}</td><td>{area}</td><td>{sal}</td><td><span class="level-badge" style="background:{color}">{level}</span></td><td>{_skills_badge(v.key_skills)}</td></tr>"""
     return f"""<table>
-      <tr><th>Вакансия</th><th>Работодатель</th><th>Город</th><th>Зарплата</th><th>Уровень</th></tr>
+      <tr><th>Вакансия</th><th>Работодатель</th><th>Адрес</th><th>Зарплата</th><th>Уровень</th><th>Ключевые навыки</th></tr>
       {rows}
     </table>"""
 
@@ -196,6 +207,8 @@ def _build_html(result: dict) -> str:
     .btn:hover {{ background:#1d4ed8; }}
     .loading {{ text-align:center; padding:40px; font-size:1.1rem; color:#555; }}
     .level-badge {{ display:inline-block; padding:2px 8px; border-radius:4px; color:white; font-size:.75rem; font-weight:600; text-transform:uppercase; }}
+    .skill-tag {{ display:inline-block; background:#e0e7ff; color:#3730a3; padding:1px 6px; border-radius:4px; font-size:.75rem; margin:1px; white-space:nowrap; }}
+    .skill-tag-more {{ background:#e5e7eb; color:#555; }}
   </style>
 </head>
 <body>
