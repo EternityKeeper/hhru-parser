@@ -1,17 +1,19 @@
 # Go
-go-scraper/bin/
+*.exe
+*.test
+*.out
 go-scraper/vendor/
 
 # Python
-python-analyzer/__pycache__/
-python-analyzer/*.egg-info/
-python-analyzer/.venv/
-python-analyzer/venv/
+__pycache__/
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
 
-# Data
-data/*.json
-data/*.csv
-data/*.db
+# Data (scraped output)
+data/
+**/data/
 
 # IDE
 .idea/
