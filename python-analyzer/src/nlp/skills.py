@@ -14,9 +14,9 @@ SENIOR_KEYWORDS = [
 
 EXPERIENCE_LEVEL_MAP = {
     "Нет опыта": "junior",
-    "От 1 года до 3 лет": "middle",
-    "От 3 до 6 лет": "senior",
-    "Более 6 лет": "senior",
+    "1–3 года": "middle",
+    "3–6 лет": "senior",
+    "более 6 лет": "senior",
 }
 
 
