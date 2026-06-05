@@ -111,7 +111,7 @@ def _vacancies_table(vacancies: list[Vacancy]) -> str:
         level = classify_level(v.name, v.description or "", v.experience)
         color = level_colors.get(level, "#888")
         rows += f"""<tr><td>{name}</td><td>{employer}</td><td>{area}</td><td>{sal}</td><td><span class="level-badge" style="background:{color}">{level}</span></td><td>{_skills_badge(v.key_skills)}</td></tr>"""
-    return f"""<table>
+    return f"""<table class="vacancy-table">
       <tr><th>Вакансия</th><th>Работодатель</th><th>Адрес</th><th>Зарплата</th><th>Уровень</th><th>Ключевые навыки</th></tr>
       {rows}
     </table>"""
@@ -207,8 +207,12 @@ def _build_html(result: dict) -> str:
     .btn:hover {{ background:#1d4ed8; }}
     .loading {{ text-align:center; padding:40px; font-size:1.1rem; color:#555; }}
     .level-badge {{ display:inline-block; padding:2px 8px; border-radius:4px; color:white; font-size:.75rem; font-weight:600; text-transform:uppercase; }}
-    .skill-tag {{ display:inline-block; background:#e0e7ff; color:#3730a3; padding:1px 6px; border-radius:4px; font-size:.75rem; margin:1px; white-space:nowrap; }}
+    .skill-tag {{ display:inline-block; background:#e0e7ff; color:#3730a3; padding:1px 5px; border-radius:4px; font-size:.7rem; margin:1px; }}
     .skill-tag-more {{ background:#e5e7eb; color:#555; }}
+    .vacancy-table {{ table-layout:fixed; }}
+    .vacancy-table td, .vacancy-table th {{ overflow:hidden; text-overflow:ellipsis; }}
+    .vacancy-table th:last-child {{ width:240px; }}
+    .vacancy-table td:last-child {{ width:240px; word-break:break-word; }}
   </style>
 </head>
 <body>
