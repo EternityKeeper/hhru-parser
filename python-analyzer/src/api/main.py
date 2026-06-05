@@ -66,11 +66,11 @@ def _form_html() -> str:
       <div class="city-grid">{city_checkboxes}</div>
     </div>
     <div class="form-row-inline">
-      <label>Период: <input type="number" name="period" value="{_meta.get("period", 30)}" min="1" size="4"> дн.</label>
-      <label>Страниц: <input type="number" name="pages" value="{_meta.get("max_pages", 1)}" min="0" size="4"> (0 = все)</label>
+      <label>Период: <input type="number" name="period" value="{_meta.get("period", 30)}" min="1" max="30" size="4"> дн.</label>
+      <label>Страниц: <input type="number" name="pages" value="{_meta.get("max_pages", 1)}" min="1" max="3" size="4"> (1-3)</label>
     </div>
     <div class="form-row">
-      <button type="submit" class="btn">🚀 Запустить парсинг</button>
+      <button type="submit" class="btn" onclick="this.disabled=true;this.textContent='⏳ Парсинг...';">🚀 Запустить парсинг</button>
     </div>
   </form>
 </details>"""
@@ -284,8 +284,9 @@ async def scrape(
     query: str = Form(...),
     areas: list[str] = Form(...),
     period: int = Form(30),
-    pages: int = Form(0),
+    pages: int = Form(1),
 ):
+    pages = max(1, min(pages, 3))
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     out_path = str(DATA_FILE.resolve())
     areas_str = ",".join(areas)
