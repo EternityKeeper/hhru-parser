@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/user/hhru-parser/go-scraper/internal/models"
 	"github.com/user/hhru-parser/go-scraper/internal/parser"
 )
 
@@ -27,14 +29,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	data, err := parser.MarshalVacancies(vacancies)
+	data, err := json.MarshalIndent(vacancies, "", "  ")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Ошибка сериализации: %v\n", err)
 		os.Exit(1)
 	}
 
-	if err := os.MkdirAll("data", 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "Ошибка создания data/: %v\n", err)
+	outDir := "data"
+	if dir := dirFromPath(*output); dir != "" {
+		outDir = dir
+	}
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "Ошибка создания %s: %v\n", outDir, err)
 		os.Exit(1)
 	}
 
@@ -44,4 +50,15 @@ func main() {
 	}
 
 	fmt.Printf("Сохранено %d вакансий в %s\n", len(vacancies), *output)
+
+	_ = models.Vacancy{}
+}
+
+func dirFromPath(p string) string {
+	for i := len(p) - 1; i >= 0; i-- {
+		if p[i] == '\\' || p[i] == '/' {
+			return p[:i]
+		}
+	}
+	return ""
 }

@@ -1,12 +1,16 @@
+import re
+from collections import Counter
+
 from src.nlp.skills import extract_skills, classify_level
 from src.models import Vacancy
-import pandas as pd
-from collections import Counter
+
+
+def _city(area: str) -> str:
+    m = re.match(r"^([^,]+)", area)
+    return m.group(1).strip() if m else area or "Не указан"
 
 
 def analyze_vacancies(vacancies: list[Vacancy]) -> dict:
-    df = pd.DataFrame([v.model_dump() for v in vacancies])
-
     skills_counter = Counter()
     level_dist = Counter()
     area_dist = Counter()
@@ -14,14 +18,18 @@ def analyze_vacancies(vacancies: list[Vacancy]) -> dict:
 
     for v in vacancies:
         skills = extract_skills(v.description or "")
+        seen = set()
         for s in v.key_skills:
-            skills.append(s)
+            key = s.lower().replace("\u00a0", " ")
+            if key not in seen:
+                seen.add(key)
+                skills.append(s)
         skills_counter.update(skills)
 
         level = classify_level(v.name, v.description or "", v.experience)
         level_dist[level] += 1
 
-        area_dist[v.area] += 1
+        area_dist[_city(v.area)] += 1
 
         if v.salary_from or v.salary_to:
             sal = v.salary_to or v.salary_from
