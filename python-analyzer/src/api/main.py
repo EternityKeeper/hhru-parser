@@ -17,6 +17,7 @@ _data: list[Vacancy] = []
 _meta: dict = {}
 
 SCRAPER_DIR = Path(__file__).resolve().parents[3] / "go-scraper"
+SCRAPER_BIN = os.environ.get("SCRAPER_BIN") or ""
 DATA_DIR = (Path(__file__).resolve().parent.parent.parent.parent / "data").resolve()
 DATA_FILE = DATA_DIR / "vacancies.json"
 
@@ -291,17 +292,17 @@ async def scrape(
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     out_path = str(DATA_FILE.resolve())
     areas_str = ",".join(areas)
-    cmd = [
-        "go", "run", "./cmd/scraper/",
-        "-q", query,
-        "-areas", areas_str,
-        "-period", str(period),
-        "-pages", str(pages),
-        "-o", out_path,
-    ]
+
+    if SCRAPER_BIN:
+        cmd = [SCRAPER_BIN, "-q", query, "-areas", areas_str, "-period", str(period), "-pages", str(pages), "-o", out_path]
+        cwd = None
+    else:
+        cmd = ["go", "run", "./cmd/scraper/", "-q", query, "-areas", areas_str, "-period", str(period), "-pages", str(pages), "-o", out_path]
+        cwd = str(SCRAPER_DIR)
+
     print(f"Running: {' '.join(cmd)}")
     try:
-        subprocess.run(cmd, cwd=str(SCRAPER_DIR), capture_output=True, text=True, timeout=120)
+        subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=120)
     except subprocess.TimeoutExpired:
         raise HTTPException(504, "Парсинг превысил лимит 120 секунд")
     except Exception as e:

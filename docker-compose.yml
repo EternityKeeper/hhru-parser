@@ -1,21 +1,9 @@
-version: "3.9"
-
 services:
-  scraper:
+  app:
     build:
-      context: ./go-scraper
-      dockerfile: Dockerfile
-    volumes:
-      - ./data:/app/data
-    command: ["-q", "Python", "-period", "30", "-o", "/app/data/vacancies.json"]
-
-  analyzer:
-    build:
-      context: ./python-analyzer
+      context: .
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
     volumes:
       - ./data:/app/data
-    depends_on:
-      - scraper
