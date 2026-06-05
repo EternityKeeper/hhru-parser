@@ -57,7 +57,7 @@ def _form_html() -> str:
     )
     return f"""<details class="search-form" {"open" if not _data else ""}>
   <summary>🔍 Параметры поиска</summary>
-  <form action="/scrape" method="post">
+  <form action="/scrape" method="post" onsubmit="var x=this.querySelector('.btn');setTimeout(function(){{x.disabled=true;x.textContent='⏳ Парсинг...';}},10);">
     <div class="form-row">
       <label>Запрос: <input type="text" name="query" value="{_meta.get("query", "Golang")}" required></label>
     </div>
@@ -70,7 +70,7 @@ def _form_html() -> str:
       <label>Страниц: <input type="number" name="pages" value="{_meta.get("max_pages", 0)}" min="0" size="4"> (0 = все)</label>
     </div>
     <div class="form-row">
-      <button type="submit" class="btn" onclick="this.disabled=true;this.textContent='⏳ Парсинг...';">🚀 Запустить парсинг</button>
+      <button type="submit" class="btn">🚀 Запустить парсинг</button>
     </div>
   </form>
 </details>"""
