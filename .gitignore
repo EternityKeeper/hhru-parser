@@ -1,0 +1,24 @@
+# Go
+go-scraper/bin/
+go-scraper/vendor/
+
+# Python
+python-analyzer/__pycache__/
+python-analyzer/*.egg-info/
+python-analyzer/.venv/
+python-analyzer/venv/
+
+# Data
+data/*.json
+data/*.csv
+data/*.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
