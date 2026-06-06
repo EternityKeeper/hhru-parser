@@ -20,30 +20,102 @@ EXPERIENCE_LEVEL_MAP = {
 }
 
 
+SKILL_ALIASES = {
+    "go": "Go",
+    "golang": "Go",
+    "postgresql": "PostgreSQL",
+    "postgres": "PostgreSQL",
+    "kubernetes": "Kubernetes",
+    "k8s": "Kubernetes",
+    "javascript": "JavaScript",
+    "typescript": "TypeScript",
+    "react": "React",
+    "vue": "Vue.js",
+    "vue.js": "Vue.js",
+    "node.js": "Node.js",
+    "nodejs": "Node.js",
+    "ci/cd": "CI/CD",
+    "github actions": "GitHub Actions",
+    "gitlab": "GitLab",
+    "git": "Git",
+    "docker": "Docker",
+    "redis": "Redis",
+    "kafka": "Kafka",
+    "rabbitmq": "RabbitMQ",
+    "nats": "NATS",
+    "grpc": "gRPC",
+    "graphql": "GraphQL",
+    "rest": "REST",
+    "rest api": "REST API",
+    "api": "API",
+    "sql": "SQL",
+    "mysql": "MySQL",
+    "mongodb": "MongoDB",
+    "clickhouse": "ClickHouse",
+    "elasticsearch": "Elasticsearch",
+    "elastic": "Elasticsearch",
+    "prometheus": "Prometheus",
+    "grafana": "Grafana",
+    "linux": "Linux",
+    "python": "Python",
+    "java": "Java",
+    "rust": "Rust",
+    "c++": "C++",
+    "nosql": "NoSQL",
+    "html": "HTML",
+    "css": "CSS",
+    "aws": "AWS",
+    "gcp": "GCP",
+    "azure": "Azure",
+    "terraform": "Terraform",
+    "ansible": "Ansible",
+    "pandas": "Pandas",
+    "numpy": "NumPy",
+    "scikit-learn": "scikit-learn",
+    "pytorch": "PyTorch",
+    "tensorflow": "TensorFlow",
+    "langchain": "LangChain",
+    "machine learning": "Machine Learning",
+    "deep learning": "Deep Learning",
+    "nlp": "NLP",
+    "llm": "LLM",
+    "fastapi": "FastAPI",
+    "django": "Django",
+    "flask": "Flask",
+    "angular": "Angular",
+    "redux": "Redux",
+    "webpack": "Webpack",
+    "prometheus": "Prometheus",
+    "agile": "Agile",
+    "scrum": "Scrum",
+    "jira": "Jira",
+    "confluence": "Confluence",
+    "microservices": "Microservices",
+    "terraform": "Terraform",
+    "elasticsearch": "ElasticSearch",
+}
+
+KNOWN_SKILLS_LOWER = sorted({s.lower() for s in SKILL_ALIASES}, key=len, reverse=True)
+
+
+def normalize_skill(name: str) -> str:
+    key = name.lower().replace("\u00a0", " ").strip()
+    return SKILL_ALIASES.get(key, name.strip())
+
+
 def extract_skills(text: str) -> list[str]:
     if not text:
         return []
 
     text_lower = text.lower()
-    known_skills = [
-        "python", "go", "golang", "rust", "c++", "java", "javascript", "typescript",
-        "sql", "postgresql", "mysql", "mongodb", "redis", "clickhouse",
-        "docker", "kubernetes", "git", "linux", "ci/cd", "github actions",
-        "fastapi", "django", "flask", "react", "vue", "angular",
-        "pandas", "numpy", "scikit-learn", "pytorch", "tensorflow", "langchain",
-        "kafka", "rabbitmq", "nats", "grpc", "rest", "graphql",
-        "aws", "gcp", "azure", "terraform", "ansible",
-        "machine learning", "deep learning", "nlp", "llm",
-        "nosql", "elasticsearch", "prometheus", "grafana",
-        "html", "css", "redux", "webpack", "node.js",
-        "oop", "solid", "tdd", "ddd", "microservices",
-        "agile", "scrum", "jira", "confluence",
-    ]
-
     found = []
-    for skill in known_skills:
+    seen = set()
+    for skill in KNOWN_SKILLS_LOWER:
         if skill in text_lower:
-            found.append(skill)
+            norm = normalize_skill(skill)
+            if norm not in seen:
+                seen.add(norm)
+                found.append(norm)
 
     return found
 

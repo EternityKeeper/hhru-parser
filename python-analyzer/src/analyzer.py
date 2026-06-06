@@ -1,13 +1,15 @@
 import re
 from collections import Counter
 
-from src.nlp.skills import extract_skills, classify_level
+from src.nlp.skills import extract_skills, classify_level, normalize_skill
 from src.models import Vacancy
 
 
 def _city(area: str) -> str:
+    if not area:
+        return "Не указан"
     m = re.match(r"^([^,]+)", area)
-    return m.group(1).strip() if m else area or "Не указан"
+    return m.group(1).strip() if m else area
 
 
 def analyze_vacancies(vacancies: list[Vacancy]) -> dict:
@@ -18,12 +20,12 @@ def analyze_vacancies(vacancies: list[Vacancy]) -> dict:
 
     for v in vacancies:
         skills = extract_skills(v.description or "")
-        seen = set()
+        seen = set(skills)
         for s in v.key_skills:
-            key = s.lower().replace("\u00a0", " ")
-            if key not in seen:
-                seen.add(key)
-                skills.append(s)
+            norm = normalize_skill(s)
+            if norm not in seen:
+                seen.add(norm)
+                skills.append(norm)
         skills_counter.update(skills)
 
         level = classify_level(v.name, v.description or "", v.experience)
