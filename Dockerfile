@@ -8,7 +8,7 @@ COPY go-scraper/ .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /scraper ./cmd/scraper
 
 # Stage 2: Python runtime with scraper binary
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 ENV SCRAPER_BIN=/usr/local/bin/scraper
