@@ -113,10 +113,10 @@ def _vacancies_table(vacancies: list[Vacancy]) -> str:
         color = level_colors.get(level, "#888")
         link = f'<a href="{v.url}" target="_blank" rel="noopener">{name}</a>' if v.url else name
         pub = v.published_at[:10] if v.published_at else "—"
-        rows += f"""<tr><td>{link}</td><td>{employer}</td><td>{area}</td><td>{sal}</td><td><span class="level-badge" style="background:{color}">{level}</span></td><td>{_skills_badge(v.key_skills)}</td><td>{pub}</td></tr>"""
-    return f"""<table class="vacancy-table">
-      <tr><th>Вакансия</th><th>Работодатель</th><th>Адрес</th><th>Зарплата</th><th>Уровень</th><th>Ключевые навыки</th><th>Дата</th></tr>
-      {rows}
+        rows += f"""<tr data-city="{area}" data-level="{level}" data-date="{pub}"><td>{link}</td><td>{employer}</td><td>{area}</td><td>{sal}</td><td><span class="level-badge" style="background:{color}">{level}</span></td><td>{_skills_badge(v.key_skills)}</td><td>{pub}</td></tr>"""
+    return f"""<table class="vacancy-table" id="vacancy-table">
+      <thead><tr><th>Вакансия</th><th>Работодатель</th><th>Адрес</th><th>Зарплата</th><th>Уровень</th><th>Ключевые навыки</th><th>Дата</th></tr></thead>
+      <tbody>{rows}</tbody>
     </table>"""
 
 
@@ -208,6 +208,10 @@ def _build_html(result: dict) -> str:
     .city-grid input[type=checkbox] {{ accent-color:#2563eb; }}
     .btn {{ background:#2563eb; color:white; border:none; padding:10px 24px; border-radius:8px; font-size:.95rem; font-weight:600; cursor:pointer; }}
     .btn:hover {{ background:#1d4ed8; }}
+    .btn-sm {{ background:#6b7280; color:white; border:none; padding:4px 12px; border-radius:6px; font-size:.8rem; cursor:pointer; }}
+    .btn-sm:hover {{ background:#4b5563; }}
+    .filter-bar {{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; padding:10px 14px; background:#f8fafc; border-radius:8px; }}
+    .filter-bar select, .filter-bar input {{ padding:5px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:.8rem; background:white; }}
     .loading {{ text-align:center; padding:40px; font-size:1.1rem; color:#555; }}
     .level-badge {{ display:inline-block; padding:2px 8px; border-radius:4px; color:white; font-size:.75rem; font-weight:600; text-transform:uppercase; }}
     .skill-tag {{ display:inline-block; background:#e0e7ff; color:#3730a3; padding:1px 5px; border-radius:4px; font-size:.7rem; margin:1px; }}
@@ -260,7 +264,14 @@ def _build_html(result: dict) -> str:
   </section>
 
   <section>
-    <h2>Вакансии ({min(total, 100)} из {total})</h2>
+    <h2>Вакансии (<span id="vis-count">{min(total, 100)}</span> из {total})</h2>
+    <div class="filter-bar">
+      <select id="filter-city"><option value="">Все города</option></select>
+      <select id="filter-level"><option value="">Все уровни</option><option value="junior">Junior</option><option value="middle">Middle</option><option value="senior">Senior</option></select>
+      <input type="date" id="filter-date-from" title="Дата с">
+      <input type="date" id="filter-date-to" title="Дата по">
+      <button class="btn-sm" onclick="resetFilters()">Сброс</button>
+    </div>
     {_vacancies_table(_data)}
   </section>
 
@@ -280,6 +291,51 @@ new Chart(document.getElementById('skillsChart'), {{
   data: {{ labels, datasets: [{{ label: 'Вакансий', data: values, backgroundColor: '#3b82f6' }}] }},
   options: {{ responsive: true, maintainAspectRatio: false, plugins: {{ legend: {{ display: false }} }} }}
 }});
+
+(function() {{
+  const table = document.getElementById('vacancy-table');
+  if (!table) return;
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const citySet = new Set();
+  rows.forEach(function(r) {{ citySet.add(r.getAttribute('data-city')); }});
+  const citySel = document.getElementById('filter-city');
+  Array.from(citySet).sort().forEach(function(c) {{
+    var o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    citySel.appendChild(o);
+  }});
+
+  function apply() {{
+    var city = document.getElementById('filter-city').value;
+    var level = document.getElementById('filter-level').value;
+    var from = document.getElementById('filter-date-from').value;
+    var to = document.getElementById('filter-date-to').value;
+    var vis = 0;
+    rows.forEach(function(r) {{
+      var ok = true;
+      if (city && r.getAttribute('data-city') !== city) ok = false;
+      if (level && r.getAttribute('data-level') !== level) ok = false;
+      if (from && r.getAttribute('data-date') < from) ok = false;
+      if (to && r.getAttribute('data-date') > to) ok = false;
+      r.style.display = ok ? '' : 'none';
+      if (ok) vis++;
+    }});
+    document.getElementById('vis-count').textContent = vis;
+  }}
+
+  document.getElementById('filter-city').onchange = apply;
+  document.getElementById('filter-level').onchange = apply;
+  document.getElementById('filter-date-from').onchange = apply;
+  document.getElementById('filter-date-to').onchange = apply;
+  window.resetFilters = function() {{
+    document.getElementById('filter-city').value = '';
+    document.getElementById('filter-level').value = '';
+    document.getElementById('filter-date-from').value = '';
+    document.getElementById('filter-date-to').value = '';
+    apply();
+  }};
+}})();
 </script>
 </body>
 </html>"""
