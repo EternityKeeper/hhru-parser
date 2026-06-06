@@ -13,4 +13,5 @@ type Vacancy struct {
 	KeySkills     []string `json:"key_skills"`
 	Employer      string   `json:"employer"`
 	PublishedAtRaw string  `json:"published_at"`
+	URL           string   `json:"url"`
 }

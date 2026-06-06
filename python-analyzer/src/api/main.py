@@ -111,10 +111,12 @@ def _vacancies_table(vacancies: list[Vacancy]) -> str:
         sal = v.salary_raw or "—"
         level = classify_level(v.name, v.description or "", v.experience)
         color = level_colors.get(level, "#888")
-        rows += f"""<tr><td>{name}</td><td>{employer}</td><td>{area}</td><td>{sal}</td><td><span class="level-badge" style="background:{color}">{level}</span></td><td>{_skills_badge(v.key_skills)}</td></tr>"""
-    return f"""<table class="vacancy-table">
-      <tr><th>Вакансия</th><th>Работодатель</th><th>Адрес</th><th>Зарплата</th><th>Уровень</th><th>Ключевые навыки</th></tr>
-      {rows}
+        link = f'<a href="{v.url}" target="_blank" rel="noopener">{name}</a>' if v.url else name
+        pub = v.published_at[:10] if v.published_at else "—"
+        rows += f"""<tr data-city="{area}" data-level="{level}" data-date="{pub}"><td>{link}</td><td>{employer}</td><td>{area}</td><td>{sal}</td><td><span class="level-badge" style="background:{color}">{level}</span></td><td>{_skills_badge(v.key_skills)}</td><td>{pub}</td></tr>"""
+    return f"""<table class="vacancy-table" id="vacancy-table">
+      <thead><tr><th>Вакансия</th><th>Работодатель</th><th>Адрес</th><th>Зарплата</th><th>Уровень</th><th>Ключевые навыки</th><th>Дата</th></tr></thead>
+      <tbody>{rows}</tbody>
     </table>"""
 
 
@@ -206,14 +208,21 @@ def _build_html(result: dict) -> str:
     .city-grid input[type=checkbox] {{ accent-color:#2563eb; }}
     .btn {{ background:#2563eb; color:white; border:none; padding:10px 24px; border-radius:8px; font-size:.95rem; font-weight:600; cursor:pointer; }}
     .btn:hover {{ background:#1d4ed8; }}
+    .btn-sm {{ background:#6b7280; color:white; border:none; padding:4px 12px; border-radius:6px; font-size:.8rem; cursor:pointer; }}
+    .btn-sm:hover {{ background:#4b5563; }}
+    .filter-bar {{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; padding:10px 14px; background:#f8fafc; border-radius:8px; }}
+    .filter-bar select, .filter-bar input {{ padding:5px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:.8rem; background:white; }}
     .loading {{ text-align:center; padding:40px; font-size:1.1rem; color:#555; }}
     .level-badge {{ display:inline-block; padding:2px 8px; border-radius:4px; color:white; font-size:.75rem; font-weight:600; text-transform:uppercase; }}
     .skill-tag {{ display:inline-block; background:#e0e7ff; color:#3730a3; padding:1px 5px; border-radius:4px; font-size:.7rem; margin:1px; }}
     .skill-tag-more {{ background:#e5e7eb; color:#555; }}
     .vacancy-table {{ table-layout:fixed; }}
     .vacancy-table td, .vacancy-table th {{ overflow:hidden; text-overflow:ellipsis; }}
-    .vacancy-table th:last-child {{ width:240px; }}
-    .vacancy-table td:last-child {{ width:240px; word-break:break-word; }}
+    .vacancy-table th:nth-child(1), .vacancy-table td:nth-child(1) {{ width:auto; }}
+    .vacancy-table th:nth-child(6), .vacancy-table td:nth-child(6) {{ width:220px; word-break:break-word; }}
+    .vacancy-table th:nth-child(7), .vacancy-table td:nth-child(7) {{ width:85px; text-align:center; white-space:nowrap; font-size:.75rem; }}
+    .vacancy-table a {{ color:#2563eb; text-decoration:none; }}
+    .vacancy-table a:hover {{ text-decoration:underline; }}
   </style>
 </head>
 <body>
@@ -255,7 +264,14 @@ def _build_html(result: dict) -> str:
   </section>
 
   <section>
-    <h2>Вакансии ({min(total, 100)} из {total})</h2>
+    <h2>Вакансии (<span id="vis-count">{min(total, 100)}</span> из {total})</h2>
+    <div class="filter-bar">
+      <select id="filter-level"><option value="">Все уровни</option><option value="junior">Junior</option><option value="middle">Middle</option><option value="senior">Senior</option></select>
+      <span style="color:#888;font-size:.8rem">Дата:</span>
+      <button class="btn-sm date-btn" onclick="setDateFilter(0,this)" style="background:#6b7280">Сегодня</button>
+      <button class="btn-sm date-btn" onclick="setDateFilter(3,this)" style="background:#6b7280">3 дня</button>
+      <button class="btn-sm date-btn" onclick="setDateFilter(7,this)" style="background:#6b7280">Неделя</button>
+    </div>
     {_vacancies_table(_data)}
   </section>
 
@@ -275,6 +291,47 @@ new Chart(document.getElementById('skillsChart'), {{
   data: {{ labels, datasets: [{{ label: 'Вакансий', data: values, backgroundColor: '#3b82f6' }}] }},
   options: {{ responsive: true, maintainAspectRatio: false, plugins: {{ legend: {{ display: false }} }} }}
 }});
+
+(function() {{
+  var table = document.getElementById('vacancy-table');
+  if (!table) return;
+  var tbody = table.querySelector('tbody');
+  var rows = Array.from(tbody.querySelectorAll('tr'));
+  var activeDays = -1;
+
+  function apply() {{
+    var level = document.getElementById('filter-level').value;
+    var cutoff = '';
+    if (activeDays >= 0) {{
+      var d = new Date();
+      d.setDate(d.getDate() - activeDays);
+      cutoff = d.toISOString().slice(0, 10);
+    }}
+    var today = new Date().toISOString().slice(0, 10);
+    var vis = 0;
+    rows.forEach(function(r) {{
+      var ok = true;
+      if (level && r.getAttribute('data-level') !== level) ok = false;
+      if (cutoff && r.getAttribute('data-date') < cutoff) ok = false;
+      if (r.getAttribute('data-date') > today) ok = false;
+      r.style.display = ok ? '' : 'none';
+      if (ok) vis++;
+    }});
+    document.getElementById('vis-count').textContent = vis;
+  }}
+
+  window.setDateFilter = function(days, btn) {{
+    activeDays = days;
+    document.querySelectorAll('.date-btn').forEach(function(b) {{
+      b.style.background = '#6b7280';
+    }});
+    if (btn) btn.style.background = '#2563eb';
+    apply();
+  }};
+
+  document.getElementById('filter-level').onchange = apply;
+  setDateFilter(7, document.querySelector('.date-btn[onclick*="setDateFilter(7"]'));
+}})();
 </script>
 </body>
 </html>"""
