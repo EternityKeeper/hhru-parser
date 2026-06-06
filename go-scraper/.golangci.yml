@@ -1,0 +1,9 @@
+run:
+  go: "1.26"
+linters:
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+  disable:
+    - unused
