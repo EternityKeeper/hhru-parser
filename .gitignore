@@ -27,3 +27,6 @@ Thumbs.db
 
 # Session logs
 session-ses_*.md
+
+# Lint
+.ruff_cache/
