@@ -16,6 +16,7 @@ class Vacancy(BaseModel):
     key_skills: list[str] = []
     employer: str = ""
     published_at: str = ""
+    url: str = ""
 
     @field_validator("key_skills", mode="before")
     @classmethod

@@ -111,9 +111,11 @@ def _vacancies_table(vacancies: list[Vacancy]) -> str:
         sal = v.salary_raw or "—"
         level = classify_level(v.name, v.description or "", v.experience)
         color = level_colors.get(level, "#888")
-        rows += f"""<tr><td>{name}</td><td>{employer}</td><td>{area}</td><td>{sal}</td><td><span class="level-badge" style="background:{color}">{level}</span></td><td>{_skills_badge(v.key_skills)}</td></tr>"""
+        link = f'<a href="{v.url}" target="_blank" rel="noopener">{name}</a>' if v.url else name
+        pub = v.published_at[:10] if v.published_at else "—"
+        rows += f"""<tr><td>{link}</td><td>{employer}</td><td>{area}</td><td>{sal}</td><td><span class="level-badge" style="background:{color}">{level}</span></td><td>{_skills_badge(v.key_skills)}</td><td>{pub}</td></tr>"""
     return f"""<table class="vacancy-table">
-      <tr><th>Вакансия</th><th>Работодатель</th><th>Адрес</th><th>Зарплата</th><th>Уровень</th><th>Ключевые навыки</th></tr>
+      <tr><th>Вакансия</th><th>Работодатель</th><th>Адрес</th><th>Зарплата</th><th>Уровень</th><th>Ключевые навыки</th><th>Дата</th></tr>
       {rows}
     </table>"""
 
@@ -212,8 +214,11 @@ def _build_html(result: dict) -> str:
     .skill-tag-more {{ background:#e5e7eb; color:#555; }}
     .vacancy-table {{ table-layout:fixed; }}
     .vacancy-table td, .vacancy-table th {{ overflow:hidden; text-overflow:ellipsis; }}
-    .vacancy-table th:last-child {{ width:240px; }}
-    .vacancy-table td:last-child {{ width:240px; word-break:break-word; }}
+    .vacancy-table th:nth-child(1), .vacancy-table td:nth-child(1) {{ width:auto; }}
+    .vacancy-table th:nth-child(6), .vacancy-table td:nth-child(6) {{ width:220px; word-break:break-word; }}
+    .vacancy-table th:nth-child(7), .vacancy-table td:nth-child(7) {{ width:85px; text-align:center; white-space:nowrap; font-size:.75rem; }}
+    .vacancy-table a {{ color:#2563eb; text-decoration:none; }}
+    .vacancy-table a:hover {{ text-decoration:underline; }}
   </style>
 </head>
 <body>

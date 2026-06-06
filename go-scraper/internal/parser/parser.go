@@ -246,6 +246,7 @@ func (c *Client) fetchVacancyPage(l vacancyLink) *models.Vacancy {
 		Area:       l.Address,
 		Experience: l.Exp,
 		Schedule:   l.Schedule,
+		URL:        l.URL,
 	}
 
 	if l.Metro != "" {
