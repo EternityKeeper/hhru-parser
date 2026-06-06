@@ -266,11 +266,15 @@ def _build_html(result: dict) -> str:
   <section>
     <h2>Вакансии (<span id="vis-count">{min(total, 100)}</span> из {total})</h2>
     <div class="filter-bar">
-      <select id="filter-city"><option value="">Все города</option></select>
       <select id="filter-level"><option value="">Все уровни</option><option value="junior">Junior</option><option value="middle">Middle</option><option value="senior">Senior</option></select>
-      <input type="date" id="filter-date-from" title="Дата с">
-      <input type="date" id="filter-date-to" title="Дата по">
-      <button class="btn-sm" onclick="resetFilters()">Сброс</button>
+      <span style="color:#888;font-size:.8rem">Дата:</span>
+      <button class="btn-sm" onclick="setDateFilter(0)">Сегодня</button>
+      <button class="btn-sm" onclick="setDateFilter(3)">3 дня</button>
+      <button class="btn-sm" onclick="setDateFilter(7)">Неделя</button>
+      <button class="btn-sm" onclick="setDateFilter(30)">Месяц</button>
+      <button class="btn-sm" onclick="setDateFilter(-1)" id="filter-date-all" style="background:#2563eb">Все</button>
+      <span id="date-label" style="font-size:.8rem;color:#888"></span>
+      <button class="btn-sm" style="background:#6b7280" onclick="resetFilters()">Сброс</button>
     </div>
     {_vacancies_table(_data)}
   </section>
@@ -293,47 +297,52 @@ new Chart(document.getElementById('skillsChart'), {{
 }});
 
 (function() {{
-  const table = document.getElementById('vacancy-table');
+  var table = document.getElementById('vacancy-table');
   if (!table) return;
-  const tbody = table.querySelector('tbody');
-  const rows = Array.from(tbody.querySelectorAll('tr'));
-  const citySet = new Set();
-  rows.forEach(function(r) {{ citySet.add(r.getAttribute('data-city')); }});
-  const citySel = document.getElementById('filter-city');
-  Array.from(citySet).sort().forEach(function(c) {{
-    var o = document.createElement('option');
-    o.value = c; o.textContent = c;
-    citySel.appendChild(o);
-  }});
+  var tbody = table.querySelector('tbody');
+  var rows = Array.from(tbody.querySelectorAll('tr'));
+  var activeDays = -1;
 
   function apply() {{
-    var city = document.getElementById('filter-city').value;
     var level = document.getElementById('filter-level').value;
-    var from = document.getElementById('filter-date-from').value;
-    var to = document.getElementById('filter-date-to').value;
+    var cutoff = '';
+    if (activeDays >= 0) {{
+      var d = new Date();
+      d.setDate(d.getDate() - activeDays);
+      cutoff = d.toISOString().slice(0, 10);
+    }}
+    var today = new Date().toISOString().slice(0, 10);
     var vis = 0;
     rows.forEach(function(r) {{
       var ok = true;
-      if (city && r.getAttribute('data-city') !== city) ok = false;
       if (level && r.getAttribute('data-level') !== level) ok = false;
-      if (from && r.getAttribute('data-date') < from) ok = false;
-      if (to && r.getAttribute('data-date') > to) ok = false;
+      if (cutoff && r.getAttribute('data-date') < cutoff) ok = false;
+      if (r.getAttribute('data-date') > today) ok = false;
       r.style.display = ok ? '' : 'none';
       if (ok) vis++;
     }});
     document.getElementById('vis-count').textContent = vis;
   }}
 
-  document.getElementById('filter-city').onchange = apply;
-  document.getElementById('filter-level').onchange = apply;
-  document.getElementById('filter-date-from').onchange = apply;
-  document.getElementById('filter-date-to').onchange = apply;
-  window.resetFilters = function() {{
-    document.getElementById('filter-city').value = '';
-    document.getElementById('filter-level').value = '';
-    document.getElementById('filter-date-from').value = '';
-    document.getElementById('filter-date-to').value = '';
+  window.setDateFilter = function(days) {{
+    activeDays = days;
+    document.querySelectorAll('#filter-date-all, .filter-bar .btn-sm').forEach(function(b) {{
+      b.style.background = b.id === 'filter-date-all' ? '#2563eb' : '#6b7280';
+    }});
+    var labels = {{'0':'сегодня','3':'за 3 дня','7':'за неделю','30':'за месяц'}};
+    var label = document.getElementById('date-label');
+    if (days < 0) {{
+      label.textContent = '';
+    }} else {{
+      label.textContent = labels[days] || '';
+    }}
     apply();
+  }};
+
+  document.getElementById('filter-level').onchange = apply;
+  window.resetFilters = function() {{
+    document.getElementById('filter-level').value = '';
+    setDateFilter(-1);
   }};
 }})();
 </script>
