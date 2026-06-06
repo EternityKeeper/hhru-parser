@@ -268,13 +268,9 @@ def _build_html(result: dict) -> str:
     <div class="filter-bar">
       <select id="filter-level"><option value="">Все уровни</option><option value="junior">Junior</option><option value="middle">Middle</option><option value="senior">Senior</option></select>
       <span style="color:#888;font-size:.8rem">Дата:</span>
-      <button class="btn-sm" onclick="setDateFilter(0)">Сегодня</button>
-      <button class="btn-sm" onclick="setDateFilter(3)">3 дня</button>
-      <button class="btn-sm" onclick="setDateFilter(7)">Неделя</button>
-      <button class="btn-sm" onclick="setDateFilter(30)">Месяц</button>
-      <button class="btn-sm" onclick="setDateFilter(-1)" id="filter-date-all" style="background:#2563eb">Все</button>
-      <span id="date-label" style="font-size:.8rem;color:#888"></span>
-      <button class="btn-sm" style="background:#6b7280" onclick="resetFilters()">Сброс</button>
+      <button class="btn-sm date-btn" onclick="setDateFilter(0,this)" style="background:#6b7280">Сегодня</button>
+      <button class="btn-sm date-btn" onclick="setDateFilter(3,this)" style="background:#6b7280">3 дня</button>
+      <button class="btn-sm date-btn" onclick="setDateFilter(7,this)" style="background:#6b7280">Неделя</button>
     </div>
     {_vacancies_table(_data)}
   </section>
@@ -324,26 +320,17 @@ new Chart(document.getElementById('skillsChart'), {{
     document.getElementById('vis-count').textContent = vis;
   }}
 
-  window.setDateFilter = function(days) {{
+  window.setDateFilter = function(days, btn) {{
     activeDays = days;
-    document.querySelectorAll('#filter-date-all, .filter-bar .btn-sm').forEach(function(b) {{
-      b.style.background = b.id === 'filter-date-all' ? '#2563eb' : '#6b7280';
+    document.querySelectorAll('.date-btn').forEach(function(b) {{
+      b.style.background = '#6b7280';
     }});
-    var labels = {{'0':'сегодня','3':'за 3 дня','7':'за неделю','30':'за месяц'}};
-    var label = document.getElementById('date-label');
-    if (days < 0) {{
-      label.textContent = '';
-    }} else {{
-      label.textContent = labels[days] || '';
-    }}
+    if (btn) btn.style.background = '#2563eb';
     apply();
   }};
 
   document.getElementById('filter-level').onchange = apply;
-  window.resetFilters = function() {{
-    document.getElementById('filter-level').value = '';
-    setDateFilter(-1);
-  }};
+  setDateFilter(7, document.querySelector('.date-btn[onclick*="setDateFilter(7"]'));
 }})();
 </script>
 </body>
