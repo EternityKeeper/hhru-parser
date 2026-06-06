@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/python-analyzer"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "gomod"
+    directory: "/go-scraper"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"

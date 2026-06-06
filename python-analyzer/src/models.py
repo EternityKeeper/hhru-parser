@@ -1,13 +1,11 @@
-from typing import Optional
-
 from pydantic import BaseModel, field_validator
 
 
 class Vacancy(BaseModel):
     name: str
     area: str
-    salary_from: Optional[int] = None
-    salary_to: Optional[int] = None
+    salary_from: int | None = None
+    salary_to: int | None = None
     salary_currency: str = ""
     salary_raw: str = ""
     experience: str = ""

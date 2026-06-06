@@ -1,6 +1,4 @@
-import pytest
-from src.nlp.skills import extract_skills, classify_level, normalize_skill
-
+from src.nlp.skills import classify_level, extract_skills, normalize_skill
 
 # ── normalize_skill ──────────────────────────────────────────────────
 
@@ -176,7 +174,7 @@ class TestAnalyzer:
         assert result["salary"]["max"] == 250000
 
     def test_analyze_city_extraction(self):
-        from src.analyzer import analyze_vacancies, _city
+        from src.analyzer import _city
         assert _city("Moscow, metro Tverskaya") == "Moscow"
         assert _city("Saint-Petersburg") == "Saint-Petersburg"
         assert _city("") == "Не указан"

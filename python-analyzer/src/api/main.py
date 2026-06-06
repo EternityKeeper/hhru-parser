@@ -2,10 +2,9 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional
 
-from fastapi import FastAPI, File, Form, Query, UploadFile, HTTPException
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import HTMLResponse
 
 from src.analyzer import analyze_vacancies
 from src.models import Vacancy
@@ -163,6 +162,13 @@ def _build_html(result: dict) -> str:
     for area, count in sorted(result.get("area_distribution", {}).items(), key=lambda x: -x[1]):
         areas_rows += f"<tr><td>{area}</td><td>{count}</td></tr>"
 
+    sba = result.get("skills_by_area", {})
+    sba_cities = json.dumps(list(sba.keys()))
+    sba_datasets = json.dumps([
+        {"label": skill, "data": [city_data.get(skill, 0) for city_data in sba.values()]}
+        for skill in (list(list(sba.values())[0].keys()) if sba else [])
+    ])
+
     return f"""<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -256,6 +262,13 @@ def _build_html(result: dict) -> str:
   </section>
 
   <section>
+    <h2>Навыки по городам</h2>
+    <div class="chart-wrap" style="height:300px">
+      <canvas id="regionChart"></canvas>
+    </div>
+  </section>
+
+  <section>
     <h2>Города</h2>
     <table>
       <tr><th>Город</th><th>Вакансий</th></tr>
@@ -291,6 +304,22 @@ new Chart(document.getElementById('skillsChart'), {{
   data: {{ labels, datasets: [{{ label: 'Вакансий', data: values, backgroundColor: '#3b82f6' }}] }},
   options: {{ responsive: true, maintainAspectRatio: false, plugins: {{ legend: {{ display: false }} }} }}
 }});
+
+const sbaCities = {sba_cities};
+const sbaDatasets = {sba_datasets};
+const colors = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16'];
+sbaDatasets.forEach(function(d,i){{ d.backgroundColor = colors[i % colors.length]; }});
+if (sbaCities.length) {{
+  new Chart(document.getElementById('regionChart'), {{
+    type: 'bar',
+    data: {{ labels: sbaCities, datasets: sbaDatasets }},
+    options: {{
+      responsive: true, maintainAspectRatio: false,
+      plugins: {{ legend: {{ position: 'bottom', labels: {{ boxWidth: 12, padding: 8, font: {{ size: 10 }} }} }} }},
+      scales: {{ x: {{ stacked: false }}, y: {{ beginAtZero: true, title: {{ display: true, text: 'Вакансий' }} }} }}
+    }}
+  }});
+}}
 
 (function() {{
   var table = document.getElementById('vacancy-table');
@@ -399,7 +428,7 @@ async def analyze_get():
 
 
 @app.post("/analyze", response_class=HTMLResponse, summary="Загрузить и проанализировать вакансии")
-async def analyze_post(file: Optional[UploadFile] = File(None)):
+async def analyze_post(file: UploadFile | None = File(None)):
     global _data
     if file:
         content = await file.read()
@@ -424,6 +453,14 @@ async def level_distribution():
         raise HTTPException(404, "No data loaded")
     result = analyze_vacancies(_data)
     return {"distribution": result["level_distribution"], "total_vacancies": result["total"]}
+
+
+@app.get("/skills/by-area", summary="Навыки по городам (JSON)")
+async def skills_by_area():
+    if not _data:
+        raise HTTPException(404, "No data loaded")
+    result = analyze_vacancies(_data)
+    return {"skills_by_area": result.get("skills_by_area", {}), "total_vacancies": result["total"]}
 
 
 @app.get("/areas", summary="Распределение по городам (JSON)")

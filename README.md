@@ -6,12 +6,40 @@
 
 ## Архитектура
 
+```mermaid
+graph TB
+    subgraph "Go-Scraper"
+        CLI[cmd/scraper/main.go] --> PARSER[internal/parser/parser.go]
+        PARSER --> HH[hh.ru HTML]
+        PARSER --> VAC[(vacancies.json)]
+    end
+
+    subgraph "Python-Analyzer"
+        API[src/api/main.py<br/>FastAPI] --> ANALYZER[src/analyzer.py]
+        ANALYZER --> NLP[src/nlp/skills.py]
+        NLP --> SKILLS[Извлечение навыков]
+        NLP --> LEVELS[Классификация уровней]
+        API --> WEB[HTML Dashboard<br/>Chart.js]
+    end
+
+    subgraph "Infrastructure"
+        DOCKER[Docker Compose] --> BUILD[Multi-stage build]
+        VAC --> API
+        GIT[GitHub] --> CI[CI Pipeline<br/>ruff + golangci-lint + tests]
+    end
+
+    CLIENTS[Browser / curl] -->|HTTP :8000| API
 ```
-┌─────────────┐    data/         ┌──────────────────┐     HTTP      ┌─────────┐
-│ Go-Scraper  │ ──vacancies.json─>│ Python-Analyzer  │ <──────────> │ Clients │
-│ (HTML parse)│                  │ FastAPI + NLP     │   REST API   │ (curl/  │
-└─────────────┘                  └──────────────────┘              │  browser)│
-                                                                   └─────────┘
+
+**Data flow:**
+
+```mermaid
+flowchart LR
+    HH[hh.ru] -->|HTML| SCR[Go Scraper<br/>3 workers]
+    SCR -->|JSON| FILE[(/data/vacancies.json)]
+    FILE -->|load| PY[Python Analyzer<br/>FastAPI]
+    PY -->|GET /| UI[HTML Dashboard]
+    PY -->|GET /stats| JSON[JSON API]
 ```
 
 ## Структура проекта
@@ -70,6 +98,7 @@ uvicorn src.api.main:app --reload
 - `POST /analyze` — загрузить JSON с вакансиями
 - `GET /stats` — полная статистика (JSON)
 - `GET /skills/top?limit=30` — топ навыков (JSON)
+- `GET /skills/by-area` — навыки по городам (JSON)
 - `GET /levels/distribution` — распределение по уровням (JSON)
 - `GET /areas` — распределение по городам (JSON)
 - `GET /salary` — зарплатная статистика (JSON)
@@ -112,6 +141,7 @@ cd python-analyzer && pytest tests/ -v
 - **NLP** — извлечение навыков (60+ keywords), классификация junior/middle/senior
 - **Docker** — Docker Compose, multi-stage build
 - **Git** — semantic commits, Git flow
+- **CI/CD** — GitHub Actions (ruff SAST, golangci-lint, pip-audit, tests)
 
 ## Как это работает
 

@@ -85,14 +85,11 @@ SKILL_ALIASES = {
     "angular": "Angular",
     "redux": "Redux",
     "webpack": "Webpack",
-    "prometheus": "Prometheus",
     "agile": "Agile",
     "scrum": "Scrum",
     "jira": "Jira",
     "confluence": "Confluence",
     "microservices": "Microservices",
-    "terraform": "Terraform",
-    "elasticsearch": "ElasticSearch",
 }
 
 KNOWN_SKILLS_LOWER = sorted({s.lower() for s in SKILL_ALIASES}, key=len, reverse=True)
