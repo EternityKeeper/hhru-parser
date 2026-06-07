@@ -403,12 +403,35 @@ async def scrape(
 @app.get("/", response_class=HTMLResponse)
 async def root():
     if not _data:
-        return HTMLResponse("""
-        <html><body style="font-family:sans-serif;padding:40px">
-        <h1>HH.ru Vacancy Analyzer</h1>
-        <p>Нет данных. Загрузите JSON через <a href="/analyze">POST /analyze</a>
-        или поместите <code>data/vacancies.json</code></p>
-        </body></html>""")
+        return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><title>HH.ru Analyzer</title>
+<style>
+  body{{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:40px;max-width:600px;margin:auto}}
+  h1{{font-size:1.5rem}} .card{{background:white;border-radius:12px;padding:24px;box-shadow:0 1px 3px #0001;margin-top:16px}}
+  label{{display:block;margin:10px 0;font-size:.9rem}}
+  input,select{{padding:8px;border:1px solid #ccc;border-radius:6px;width:100%;font-size:.9rem}}
+  .city-grid{{display:flex;flex-wrap:wrap;gap:6px}}
+  .city-grid label{{display:inline-flex;align-items:center;gap:4px;background:#e5e7eb;padding:4px 10px;border-radius:6px;font-size:.85rem;cursor:pointer}}
+  button{{background:#2563eb;color:white;border:none;padding:10px 24px;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer}}
+  .inline{{display:flex;gap:12px}} .inline label{{flex:1}}
+</style></head><body>
+<h1>HH.ru Vacancy Analyzer</h1>
+<p style="color:#888">Нет данных. Заполните форму и запустите парсинг.</p>
+<div class="card">
+<form action="/scrape" method="post">
+  <label>Запрос: <input type="text" name="query" value="Golang" required></label>
+  <label>Регионы:</label>
+  <div class="city-grid">
+    {"".join(f'<label><input type="checkbox" name="areas" value="{id}" checked> {name}</label>' for id,name in CITIES)}
+  </div>
+  <div class="inline">
+    <label>Период: <input type="number" name="period" value="3" min="1" max="7"></label>
+    <label>Страниц: <input type="number" name="pages" value="1" min="0"></label>
+  </div>
+  <button type="submit" style="margin-top:14px">Запустить парсинг</button>
+</form>
+<p style="margin-top:16px;font-size:.85rem">Или загрузите свой JSON через <a href="/analyze">POST /analyze</a></p>
+</div></body></html>""")
     return _build_html(analyze_vacancies(_data))
 
 
