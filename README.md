@@ -59,6 +59,12 @@ flowchart LR
 │   │   ├── models.py             # Pydantic модель
 │   │   └── nlp/skills.py         # Извлечение навыков, классификация уровней
 │   └── tests/test_all.py         # Тесты pytest
+├── telegram-bot/                  # Telegram-бот (python-telegram-bot)
+│   ├── bot.py                     # Обработчики команд
+│   ├── checker.py                 # Проверка подписок (Go scraper + NLP)
+│   ├── db.py                      # SQLite (подписки, отправленные)
+│   ├── Dockerfile                 # Мультистейдж под бота
+│   └── requirements.txt
 ├── data/                          # JSON-файлы вакансий (shared volume)
 ├── Dockerfile                     # Мультистейдж: Go build → Python runtime
 ├── docker-compose.yml             # docker compose up --build
@@ -112,6 +118,21 @@ docker compose up --build
 
 Собирает Go-бинарник + Python-образ в одном мультистейдж `Dockerfile`, запускает сервер на `http://localhost:8000`.  
 При POST /scrape Python вызывает встроенный Go-бинарник (не `go run`), данные сохраняются в `data/` через shared volume.
+
+### 4. Telegram Bot
+
+Бот для мониторинга вакансий: подписка по запросу, региону и уровню.  
+Команды: `/start`, `/subscribe`, `/list`, `/unsubscribe`, `/check`.
+
+**Ссылка:** [@hhru_parser_note_bot](https://t.me/hhru_parser_note_bot)
+
+```bash
+# Отдельный сервис в Docker
+docker compose up bot --build
+
+# Или напрямую (без Docker, WARP)
+python telegram-bot/bot.py
+```
 
 ## Пример работы
 

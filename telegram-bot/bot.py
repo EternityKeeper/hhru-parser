@@ -172,6 +172,10 @@ async def cmd_unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+async def cmd_besttadjiki(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("@akahatiko @Iovetanks")
+
+
 async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     subs = db.get_user_subscriptions(update.effective_user.id)
     if not subs:
@@ -234,6 +238,7 @@ def main():
     app.add_handler(CommandHandler("list", cmd_list))
     app.add_handler(CommandHandler("unsubscribe", cmd_unsubscribe))
     app.add_handler(CommandHandler("check", cmd_check))
+    app.add_handler(CommandHandler("besttadjiki", cmd_besttadjiki))
 
     job_queue = app.job_queue
     job_queue.run_repeating(
