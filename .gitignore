@@ -25,6 +25,9 @@ data/
 .DS_Store
 Thumbs.db
 
+# Environment (secrets)
+.env
+
 # Session logs
 session-ses_*.md
 

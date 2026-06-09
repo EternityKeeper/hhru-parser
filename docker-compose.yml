@@ -6,4 +6,18 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/data
+      - ./data:/app/data
+    environment:
+      - SCRAPER_BIN=/usr/local/bin/scraper
+
+  bot:
+    build:
+      context: .
+      dockerfile: telegram-bot/Dockerfile
+    volumes:
+      - ./data:/app/data
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - CHECK_INTERVAL=${CHECK_INTERVAL:-30}
+      - SCRAPER_BIN=/usr/local/bin/scraper
+      - DATA_DIR=/app/data

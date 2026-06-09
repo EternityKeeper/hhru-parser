@@ -1,0 +1,2 @@
+python-telegram-bot[job-queue]==21.10
+pymorphy3==2.0.1
