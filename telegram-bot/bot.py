@@ -220,7 +220,14 @@ async def scheduled_check(context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     logger.info("Starting bot...")
-    app = Application.builder().token(TOKEN).build()
+    app = (
+        Application.builder()
+        .token(TOKEN)
+        .connect_timeout(30)
+        .read_timeout(30)
+        .write_timeout(30)
+        .build()
+    )
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("subscribe", cmd_subscribe))

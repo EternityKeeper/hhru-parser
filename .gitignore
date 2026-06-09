@@ -8,6 +8,7 @@ go-scraper/vendor/
 __pycache__/
 *.egg-info/
 .venv/
+.venv-bot/
 venv/
 .pytest_cache/
 
@@ -33,3 +34,6 @@ session-ses_*.md
 
 # Lint
 .ruff_cache/
+
+# Build artifacts
+scraper.exe
