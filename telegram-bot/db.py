@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class Database:
@@ -99,4 +99,12 @@ class Database:
             conn.execute(
                 "INSERT OR IGNORE INTO sent_vacancies (chat_id, url) VALUES (?, ?)",
                 (chat_id, url),
+            )
+
+    def cleanup(self, days: int = 90):
+        with self._conn() as conn:
+            cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+            conn.execute(
+                "DELETE FROM sent_vacancies WHERE sent_at < ?",
+                (cutoff,),
             )

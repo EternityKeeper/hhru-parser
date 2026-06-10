@@ -203,6 +203,8 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def scheduled_check(context: ContextTypes.DEFAULT_TYPE):
+    db.cleanup(days=90)
+
     subs = db.get_subscriptions()
     if not subs:
         return
