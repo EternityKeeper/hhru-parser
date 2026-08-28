@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Stage 1: build Go scraper
-FROM golang:1.26-alpine AS go-builder
+FROM golang:1.27-alpine AS go-builder
 WORKDIR /build
 COPY go-scraper/go.mod go-scraper/go.sum ./
 RUN go mod download
